@@ -2,6 +2,7 @@ __pycache__/
 .idea/
 .DS_Store
 datasets/
+result_pics/
 
 # Jupyter Notebook
 .ipynb_checkpoints

@@ -18,29 +18,36 @@ def one_hot_encode_labels(labels):
     return one_hot
 
 
-def train_validation_error(train_errors, validation_errors, title='', save=False):
+def train_validation_error(train_errors, validation_errors, title='', save=None):
+    plt.clf()
     plt.plot(train_errors, label='train error')
     plt.plot(validation_errors, label='validation error')
     plt.title(title)
-    plt.xlabel('Epochs')
+    plt.xlabel('epochs')
     plt.ylabel('loss')
     plt.legend()
-    plt.show()
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig("result_pics/error_" + save)
 
 
-def montage(W):
+def montage(W, labels, title='', save=None):
     """ Display the image for each label in W """
-    import matplotlib.pyplot as plt
     fig, ax = plt.subplots(2, 5)
+    fig.suptitle(title)
     for i in range(2):
         for j in range(5):
             im = W[i * 5 + j, :].reshape(32, 32, 3, order='F')
             sim = (im - np.min(im[:])) / (np.max(im[:]) - np.min(im[:]))
             sim = sim.transpose(1, 0, 2)
             ax[i][j].imshow(sim, interpolation='nearest')
-            ax[i][j].set_title("y=" + str(5 * i + j))
+            ax[i][j].set_title(labels[5 * i + j])
             ax[i][j].axis('off')
-    plt.show()
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig("result_pics/montage_" + save)
 
 
 def show_image(image):

@@ -39,7 +39,7 @@ class Classifier:
         return grad_W, grad_b
 
     def fit(self, x, y, x_val=None, y_val=None, n_batch=100, eta=0.001, n_epochs=40,
-            reg_lambda=0):  # function [Wstar, bstar] = MiniBatchGD(X, Y, GDparams, W, b, lambda)
+            reg_lambda=0, shuffle=False, rate_decay=1):  # function [Wstar, bstar] = MiniBatchGD(X, Y, GDparams, W, b, lambda)
 
         self.W = np.random.normal(loc=0, scale=0.01, size=(self.output_size, self.input_size))
         self.b = np.random.normal(loc=0, scale=0.01, size=(self.output_size, 1))
@@ -47,6 +47,10 @@ class Classifier:
         data_points = x.shape[1]
         train_errors, val_errors = [], []
         for _ in tqdm(range(n_epochs)):
+            if shuffle:
+                x = np.copy(x.T)
+                np.random.shuffle(x)
+                x = x.T
             for i in range(int(data_points / n_batch) - 1):
                 start = i * n_batch
                 end = min((i + 1) * n_batch, data_points)
@@ -58,6 +62,7 @@ class Classifier:
             train_errors.append(self.compute_cost(x, y, reg_lambda))
             if x_val is not None:
                 val_errors.append(self.compute_cost(x_val, y_val, reg_lambda))
+            eta *= rate_decay
         return train_errors, val_errors
 
     def compute_gradients_num(self, x, y, reg_lambda, h=1e-6):
