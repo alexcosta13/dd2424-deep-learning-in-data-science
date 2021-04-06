@@ -18,8 +18,14 @@ class Classifier:
     def compute_cost(self, x, y, reg_lambda,
                      loss_function="cross_entropy"):  # equivalent to function J = ComputeCost(X, Y, W, b, lambda)
         batch_size = x.shape[1]
+        p = self.predict(x)
         if loss_function == "cross_entropy":
-            loss = - np.log(np.sum(y * self.predict(x), axis=0))
+            loss = - np.log(np.sum(y * p, axis=0))
+        elif loss_function == "svm":
+            s_y = np.sum(y * p, axis=0)
+            s = np.maximum(np.zeros(p.shape), p - s_y + 1)
+            s[y.astype(bool)] = 0
+            loss = np.sum(s, axis=0)
         else:
             raise Exception("Loss function not implemented")
         reg = reg_lambda * np.sum(self.W ** 2)
@@ -30,16 +36,31 @@ class Classifier:
         a = np.argmax(prediction, axis=0) == np.argmax(y, axis=0)
         return np.count_nonzero(a) / np.size(a)
 
-    def compute_gradients(self, x, y, reg_lambda):  # function [grad W, grad b] = ComputeGradients(X, Y, P, W, lambda)
+    def compute_gradients(self, x, y, reg_lambda, loss_function="cross_entropy"):  # function [grad W, grad b] = ComputeGradients(X, Y, P, W, lambda)
         batch_size = x.shape[1]
         p = self.predict(x)
-        g = - (y - p)
-        grad_W = 1 / batch_size * g @ x.T + 2 * reg_lambda * self.W
-        grad_b = 1 / batch_size * g @ np.ones(shape=(batch_size, 1))
+        if loss_function == "cross_entropy":
+            g = - (y - p)
+            grad_W = 1 / batch_size * g @ x.T + 2 * reg_lambda * self.W
+            grad_b = 1 / batch_size * g @ np.ones(shape=(batch_size, 1))
+
+        elif loss_function == "svm":
+            s_y = np.sum(y * p, axis=0)
+            gradient = np.heaviside(p - s_y + 1, 0)
+            gradient[y.astype(bool)] = 0
+            misclassification_count = np.sum(gradient, axis=0)
+            gradient[np.argmax(y, axis=0), np.arange(batch_size)] = - misclassification_count
+
+            grad_W = gradient @ x.T / batch_size + reg_lambda * self.W
+            grad_b = gradient @ np.ones(shape=(batch_size, 1)) / batch_size
+
+        else:
+            raise Exception("Loss function not implemented")
+
         return grad_W, grad_b
 
     def fit(self, x, y, x_val=None, y_val=None, n_batch=100, eta=0.001, n_epochs=40,
-            reg_lambda=0, shuffle=False, rate_decay=1):  # function [Wstar, bstar] = MiniBatchGD(X, Y, GDparams, W, b, lambda)
+            reg_lambda=0, shuffle=False, decay_factor=1, loss_function="cross_entropy"):  # function [Wstar, bstar] = MiniBatchGD(X, Y, GDparams, W, b, lambda)
 
         self.W = np.random.normal(loc=0, scale=0.01, size=(self.output_size, self.input_size))
         self.b = np.random.normal(loc=0, scale=0.01, size=(self.output_size, 1))
@@ -48,21 +69,22 @@ class Classifier:
         train_errors, val_errors = [], []
         for _ in tqdm(range(n_epochs)):
             if shuffle:
-                x = np.copy(x.T)
-                np.random.shuffle(x)
-                x = x.T
+                p = np.random.permutation(x.shape[1])
+                x = x[:, p]
+                y = y[:, p]
+
             for i in range(int(data_points / n_batch) - 1):
                 start = i * n_batch
                 end = min((i + 1) * n_batch, data_points)
                 x_batch = x[:, start:end]
                 y_batch = y[:, start:end]
-                grad_W, grad_b = self.compute_gradients(x_batch, y_batch, reg_lambda)
+                grad_W, grad_b = self.compute_gradients(x_batch, y_batch, reg_lambda, loss_function)
                 self.W -= eta * grad_W
                 self.b -= eta * grad_b
-            train_errors.append(self.compute_cost(x, y, reg_lambda))
+            train_errors.append(self.compute_cost(x, y, reg_lambda, loss_function))
             if x_val is not None:
-                val_errors.append(self.compute_cost(x_val, y_val, reg_lambda))
-            eta *= rate_decay
+                val_errors.append(self.compute_cost(x_val, y_val, reg_lambda, loss_function))
+            eta *= decay_factor
         return train_errors, val_errors
 
     def compute_gradients_num(self, x, y, reg_lambda, h=1e-6):

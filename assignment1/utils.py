@@ -29,7 +29,7 @@ def train_validation_error(train_errors, validation_errors, title='', save=None)
     if save is None:
         plt.show()
     else:
-        plt.savefig("result_pics/error_" + save)
+        plt.savefig("result_pics/error-" + save)
 
 
 def montage(W, labels, title='', save=None):
@@ -47,7 +47,7 @@ def montage(W, labels, title='', save=None):
     if save is None:
         plt.show()
     else:
-        plt.savefig("result_pics/montage_" + save)
+        plt.savefig("result_pics/montage-" + save)
 
 
 def show_image(image):
