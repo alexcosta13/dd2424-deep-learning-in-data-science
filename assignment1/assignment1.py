@@ -119,8 +119,8 @@ def all_optimizations():
 
 
 def svm():
-    test_error, val_error = classifier.fit(X_train, Y_train, X_val, Y_val, loss_function='svm', n_epochs=50, n_batch=1000,
-                                           eta=0.001)
+    test_error, val_error = classifier.fit(X_train, Y_train, X_val, Y_val, loss_function='svm', n_epochs=100,
+                                           n_batch=1000, eta=0.001, reg_lambda=0.9)
 
     train_validation_error(test_error, val_error, title=r'Training and validation error', save='svm')
     montage(classifier.W, y, title=r'Learned weights', save="svm")
