@@ -149,8 +149,6 @@ class Classifier:
 
         if loss_function == "cross_entropy":
             p = softmax(W @ x + b)
-            # loss = np.sum(-np.log(y.T @ p), axis=1)
-            # loss = - np.log(np.trace(y.T @ p))
             loss = -np.log(np.sum(y * p, axis=0))
         else:
             loss = 0
