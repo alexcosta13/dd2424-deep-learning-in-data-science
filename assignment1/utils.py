@@ -11,13 +11,6 @@ def normalize(data, mean, std):
     return (data - mean) / std
 
 
-def one_hot_encode_labels(labels):
-    vector = np.array(labels)
-    one_hot = np.zeros((vector.size, vector.max() + 1))
-    one_hot[np.arange(vector.size), vector] = 1
-    return one_hot
-
-
 def train_validation_error(train_errors, validation_errors, title='', save=None):
     plt.clf()
     plt.plot(train_errors, label='train error')
