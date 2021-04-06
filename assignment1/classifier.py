@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 class Classifier:
     def __init__(self, input_size, output_size):
-        np.random.seed(seed=400)
+        np.random.seed(400)
         self.input_size = input_size
         self.output_size = output_size
         self.W = np.random.normal(loc=0, scale=0.01, size=(output_size, input_size))
@@ -15,13 +15,13 @@ class Classifier:
         s = self.W @ x + self.b
         return softmax(s)
 
-    def compute_cost(self, x, y, reg_lambda,
-                     loss_function="cross_entropy"):  # equivalent to function J = ComputeCost(X, Y, W, b, lambda)
+    def compute_cost(self, x, y, reg_lambda, loss_function="cross_entropy"):  # equivalent to function J = ComputeCost(X, Y, W, b, lambda)
         batch_size = x.shape[1]
-        p = self.predict(x)
         if loss_function == "cross_entropy":
+            p = self.predict(x)
             loss = - np.log(np.sum(y * p, axis=0))
         elif loss_function == "svm":
+            p = self.W @ x + self.b
             s_y = np.sum(y * p, axis=0)
             s = np.maximum(np.zeros(p.shape), p - s_y + 1)
             s[y.astype(bool)] = 0
@@ -38,13 +38,14 @@ class Classifier:
 
     def compute_gradients(self, x, y, reg_lambda, loss_function="cross_entropy"):  # function [grad W, grad b] = ComputeGradients(X, Y, P, W, lambda)
         batch_size = x.shape[1]
-        p = self.predict(x)
         if loss_function == "cross_entropy":
+            p = self.predict(x)
             g = - (y - p)
             grad_W = 1 / batch_size * g @ x.T + 2 * reg_lambda * self.W
             grad_b = 1 / batch_size * g @ np.ones(shape=(batch_size, 1))
 
         elif loss_function == "svm":
+            p = self.W @ x + self.b
             s_y = np.sum(y * p, axis=0)
             gradient = np.heaviside(p - s_y + 1, 0)
             gradient[y.astype(bool)] = 0
@@ -62,6 +63,7 @@ class Classifier:
     def fit(self, x, y, x_val=None, y_val=None, n_batch=100, eta=0.001, n_epochs=40,
             reg_lambda=0, shuffle=False, decay_factor=1, loss_function="cross_entropy"):  # function [Wstar, bstar] = MiniBatchGD(X, Y, GDparams, W, b, lambda)
 
+        np.random.seed(400)
         self.W = np.random.normal(loc=0, scale=0.01, size=(self.output_size, self.input_size))
         self.b = np.random.normal(loc=0, scale=0.01, size=(self.output_size, 1))
 

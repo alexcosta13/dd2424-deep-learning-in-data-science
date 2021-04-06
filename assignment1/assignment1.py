@@ -2,44 +2,10 @@ import numpy as np
 
 from classifier import Classifier
 from data import *
-from utils import normalize, one_hot_encode_labels, montage, train_validation_error, show_image
+from utils import normalize, montage, train_validation_error
 
 
 BATCH_SIZE = 20
-
-
-def load_data(file_name):
-    train_data = load_batch(file_name)
-    X, Y = dict_to_data_and_label(train_data)
-    Y = one_hot_encode_labels(Y)
-    y = [image.decode('utf-8') for image in load_label_names()]
-    return X.T, Y.T, y
-
-
-def load_all_data(validation=False):
-    files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4', 'data_batch_5']
-    X, Y = None, None
-    for file in files:
-        train_data = load_batch(file)
-        x_batch, y_batch = dict_to_data_and_label(train_data)
-        y_batch = one_hot_encode_labels(y_batch)
-
-        if validation:
-            x_batch = x_batch[9800:, :]
-            y_batch = y_batch[9800:, :]
-        else:
-            x_batch = x_batch[:9800, :]
-            y_batch = y_batch[:9800, :]
-
-        if X is None:
-            X = x_batch.T
-            Y = y_batch.T
-        else:
-            X = np.concatenate((X, x_batch.T), axis=1)
-            Y = np.concatenate((Y, y_batch.T), axis=1)
-
-    y = [image.decode('utf-8') for image in load_label_names()]
-    return X, Y, y
 
 
 def check_gradients(reg=0.0, slow=False):
@@ -51,11 +17,6 @@ def check_gradients(reg=0.0, slow=False):
     equal = np.allclose(grad_W, grad_W_num, rtol=1e-6, atol=1e-6) and np.allclose(grad_b, grad_b_num, rtol=1e-6, atol=1e-6)
     threshold = max(np.max(np.abs(grad_W - grad_W_num)), np.max(np.abs(grad_b - grad_b_num)))
     return equal, threshold
-
-
-def explore_images(n, input_data):
-    for i in range(n):
-        show_image(input_data[:, i])
 
 
 def basic_assignment():
@@ -157,6 +118,15 @@ def all_optimizations():
     print("Classifier accuracy (eta=0.001 and lambda=0.1, more training data)", "{:.2%}".format(classifier.accuracy(X_more_test, Y_more_test)))
 
 
+def svm():
+    test_error, val_error = classifier.fit(X_train, Y_train, X_val, Y_val, loss_function='svm', n_epochs=50, n_batch=1000,
+                                           eta=0.001)
+
+    train_validation_error(test_error, val_error, title=r'Training and validation error', save='svm')
+    montage(classifier.W, y, title=r'Learned weights', save="svm")
+    print("Classifier accuracy (eta=0.001 and lambda=0.1)", "{:.2%}".format(classifier.accuracy(X_test, Y_test)))
+
+
 if __name__ == "__main__":
     X_train, Y_train, y = load_data('data_batch_1')
     X_mean = np.mean(X_train, axis=1).reshape(X_train.shape[0], 1)
@@ -193,8 +163,4 @@ if __name__ == "__main__":
 
     # all_optimizations()
 
-    test_error, val_error = classifier.fit(X_train, Y_train, X_val, Y_val, loss_function='svm', n_epochs=100)
-
-    train_validation_error(test_error, val_error, title=r'Training and validation error$')
-    print("Classifier accuracy (eta=0.001 and lambda=0.1)", "{:.2%}".format(classifier.accuracy(X_test, Y_test)))
-
+    svm()
