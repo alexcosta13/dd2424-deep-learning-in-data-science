@@ -11,18 +11,21 @@ def normalize(data, mean, std):
     return (data - mean) / std
 
 
-def train_validation_error(train_errors, validation_errors, title='', save=None):
+def train_validation_error(train_errors, validation_errors, title='', save=None, label='', steps=0):
+    data_points = len(train_errors)
+    x_axis = [(i + 1) * steps/data_points for i in range(data_points)]
+
     plt.clf()
-    plt.plot(train_errors, label='train error')
-    plt.plot(validation_errors, label='validation error')
+    plt.plot(x_axis, train_errors, label='training')
+    plt.plot(x_axis, validation_errors, label='validation')
     plt.title(title)
-    plt.xlabel('epochs')
-    plt.ylabel('loss')
+    plt.xlabel('update step')
+    plt.ylabel(label)
     plt.legend()
     if save is None:
         plt.show()
     else:
-        plt.savefig("result_pics/error-" + save)
+        plt.savefig("result_pics/" + label + "-" + save)
 
 
 def montage(W, labels, title='', save=None):
