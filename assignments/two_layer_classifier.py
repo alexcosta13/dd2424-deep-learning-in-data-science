@@ -91,7 +91,8 @@ class Classifier:
         a = np.argmax(prediction, axis=0) == np.argmax(y, axis=0)
         return np.count_nonzero(a) / np.size(a)
 
-    def fit(self, x, y, x_val=None, y_val=None, n_batch=100, eta_min=1e-5, eta_max=1e-1, ns=500, k=1, reg_lambda=0.01):
+    def fit(self, x, y, x_val=None, y_val=None, n_batch=100, eta_min=1e-5, eta_max=1e-1, ns=500, k=1, reg_lambda=0.01,
+            jitter=False):
         data_points = x.shape[1]
         train_cost, val_cost, train_loss, val_loss, train_accuracy, val_accuracy = [], [], [], [], [], []
         n_epochs = int(2 * ns * k / (data_points / n_batch))
@@ -105,6 +106,10 @@ class Classifier:
                 end = min((i + 1) * n_batch, data_points)
                 x_batch = x[:, start:end]
                 y_batch = y[:, start:end]
+                if jitter:
+                    noise = np.random.normal(0, 0.001, size=x_batch.shape)
+                    x_batch = x_batch + noise
+
                 eta = next(cycle)
 
                 grad_W_2, grad_b_2, grad_W_1, grad_b_1 = self.compute_gradients(x_batch, y_batch, reg_lambda)

@@ -56,3 +56,17 @@ def show_image(image):
     plt.imshow(sim, interpolation='nearest')
     plt.show()
 
+
+def translate(images, shift=10, vertical=False):
+    if vertical:
+        images = images.copy()
+        right_slice = images[-shift:, :].copy()
+        images[shift:, :] = images[:-shift, :]
+        images[:shift, :] = np.fliplr(right_slice)
+        return images
+    else:
+        images = images.copy()
+        right_slice = images[:, -shift:].copy()
+        images[:, shift:] = images[:, :-shift]
+        images[:, :shift] = np.fliplr(right_slice)
+        return images
