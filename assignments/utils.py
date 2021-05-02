@@ -28,6 +28,26 @@ def train_validation_error(train_errors, validation_errors, title='', save=None,
         plt.savefig("result_pics/" + label + "-" + save)
 
 
+def compare_batch_plot(train_errors, validation_errors, batch_train_errors, batch_val_errors
+                       , title='', save=None, label='', steps=0):
+    data_points = len(train_errors)
+    x_axis = [(i + 1) * steps/data_points for i in range(data_points)]
+
+    plt.clf()
+    plt.plot(x_axis, train_errors, 'c', label='training without bn')
+    plt.plot(x_axis, validation_errors, 'c--', label='validation without bn')
+    plt.plot(x_axis, batch_train_errors, 'b', label='training with bn')
+    plt.plot(x_axis, batch_val_errors, 'b--', label='validation with bn')
+    plt.title(title)
+    plt.xlabel('update step')
+    plt.ylabel(label)
+    plt.legend()
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig("result_pics/" + label + "-" + save)
+
+
 def montage(W, labels, title='', save=None):
     """ Display the image for each label in W """
     fig, ax = plt.subplots(2, 5)
