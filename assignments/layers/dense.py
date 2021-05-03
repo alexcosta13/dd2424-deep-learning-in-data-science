@@ -42,7 +42,6 @@ class Dense(layer.Layer):
         self.grad_bias = 1 / batch_size * g @ np.ones(shape=(batch_size, 1))
 
         g = self.kernel.T @ g
-        g[self.last_input <= 0] = 0
 
         return g
 

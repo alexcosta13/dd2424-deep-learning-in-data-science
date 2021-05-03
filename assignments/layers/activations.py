@@ -11,6 +11,10 @@ class ReLU(layer.Layer):
         self.last_output = np.maximum(0, x)
         return self.last_output
 
+    def backward(self, g, reg_lambda):
+        g[self.last_input <= 0] = 0
+        return g
+
 
 class Softmax(layer.Layer):
     def __init__(self):
