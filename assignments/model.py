@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from tqdm import tqdm
-from utils import horizontal_flip, translate
+from utils import horizontal_flip
 
 
 class Model:
@@ -15,6 +15,7 @@ class Model:
 
     def add(self, layer):
         # TODO check if layer is of type layer
+        # TODO check if dimensions match - otherwise the training might fail
         self.layers.append(layer)
 
     def predict(self, x, train=False):

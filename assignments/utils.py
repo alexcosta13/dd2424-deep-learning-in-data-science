@@ -29,15 +29,15 @@ def train_validation_error(train_errors, validation_errors, title='', save=None,
 
 
 def compare_batch_plot(train_errors, validation_errors, batch_train_errors, batch_val_errors
-                       , title='', save=None, label='', steps=0):
+                       , title='', save=None, label='', steps=0, comparing_label='bn'):
     data_points = len(train_errors)
     x_axis = [(i + 1) * steps/data_points for i in range(data_points)]
 
     plt.clf()
-    plt.plot(x_axis, train_errors, 'c', label='training without bn')
-    plt.plot(x_axis, validation_errors, 'c--', label='validation without bn')
-    plt.plot(x_axis, batch_train_errors, 'b', label='training with bn')
-    plt.plot(x_axis, batch_val_errors, 'b--', label='validation with bn')
+    plt.plot(x_axis, train_errors, 'c', label=f'training without {comparing_label}')
+    plt.plot(x_axis, validation_errors, 'c--', label=f'validation without {comparing_label}')
+    plt.plot(x_axis, batch_train_errors, 'b', label=f'training with {comparing_label}')
+    plt.plot(x_axis, batch_val_errors, 'b--', label=f'validation with {comparing_label}')
     plt.title(title)
     plt.xlabel('update step')
     plt.ylabel(label)
@@ -97,9 +97,7 @@ def horizontal_flip(images):
     size /= 3
     size = int(np.sqrt(size))
     for i in range(3 * size):
-        index1 = i * size
         a = images[:i * size, :]
-        index2 = (i + 1) * size
         b = np.flipud(images[i * size:(i + 1) * size, :])
         c = images[(i + 1) * size:, :]
         images = np.concatenate((a, b, c))

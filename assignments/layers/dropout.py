@@ -18,5 +18,4 @@ class Dropout(layer.Layer):
         return self.last_output
 
     def backward(self, g, reg_lambda):
-        # TODO aixo sha de fer?
         return g * self.last_dropout
