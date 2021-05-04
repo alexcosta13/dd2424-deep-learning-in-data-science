@@ -1,5 +1,7 @@
 import numpy as np
+import random
 from tqdm import tqdm
+from utils import horizontal_flip, translate
 
 
 class Model:
@@ -33,7 +35,7 @@ class Model:
         return np.count_nonzero(a) / np.size(a)
 
     def fit(self, x, y, x_val=None, y_val=None, n_batch=100, eta_min=1e-5, eta_max=1e-1, ns=500, k=1, reg_lambda=0.01,
-            shuffle=True):
+            shuffle=True, random_jitter=False, random_flip=False):
         data_points = x.shape[1]
         train_loss, val_loss, train_accuracy, val_accuracy = [], [], [], []
         n_epochs = int(2 * ns * k / (data_points / n_batch))
@@ -51,6 +53,13 @@ class Model:
                 end = min((i + 1) * n_batch, data_points)
                 x_batch = x[:, start:end]
                 y_batch = y[:, start:end]
+
+                if random_jitter:
+                    noise = np.random.normal(loc=0.0, scale=0.15, size=x_batch.shape)
+                    x_batch += noise
+
+                if random_flip and random.choice([True, False]):
+                    x_batch = horizontal_flip(x_batch)
 
                 eta = next(cycle)
 

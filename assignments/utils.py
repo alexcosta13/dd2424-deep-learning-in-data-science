@@ -90,3 +90,17 @@ def translate(images, shift=10, vertical=False):
         images[:, shift:] = images[:, :-shift]
         images[:, :shift] = np.fliplr(right_slice)
         return images
+
+
+def horizontal_flip(images):
+    size = images.shape[0]
+    size /= 3
+    size = int(np.sqrt(size))
+    for i in range(3 * size):
+        index1 = i * size
+        a = images[:i * size, :]
+        index2 = (i + 1) * size
+        b = np.flipud(images[i * size:(i + 1) * size, :])
+        c = images[(i + 1) * size:, :]
+        images = np.concatenate((a, b, c))
+    return images
