@@ -65,3 +65,20 @@ def one_hot_encode_labels(labels):
 def explore_images(n, input_data):
     for i in range(n):
         show_image(input_data[:, i])
+
+
+def read_text_file(filename):
+    with open('datasets/' + filename, 'r') as f:
+        text = f.read()
+    return text
+
+
+def load_and_process_text(filename):
+    book_data = [c for c in read_text_file(filename)]
+    book_chars = list(set(book_data))
+    char_2_indices = {val: index for index, val in enumerate(book_chars)}
+    indices_2_char = {index: val for index, val in enumerate(book_chars)}
+    return {'book_data': book_data,
+            'book_chars': book_chars,
+            'char_2_indices': char_2_indices,
+            'indices_2_char': indices_2_char}

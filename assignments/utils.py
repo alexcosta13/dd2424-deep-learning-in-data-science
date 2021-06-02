@@ -102,3 +102,31 @@ def horizontal_flip(images):
         c = images[(i + 1) * size:, :]
         images = np.concatenate((a, b, c))
     return images
+
+
+def sample_from_probability(k, probabilities):
+    return np.random.choice(k, 1, p=probabilities)
+
+
+def indices_2_chars(indices, dict_):
+    output = ""
+    for i in indices:
+        output += dict_[i]
+    return output
+
+
+def chars_2_indices(chars, dict_):
+    output = []
+    for c in chars:
+        output.append(dict_[c])
+    return output
+
+
+def index_2_one_hot(i, size):
+    if type(i) is int or i.size == 1:
+        one_hot = np.zeros((size, 1))
+        one_hot[i] = 1
+    else:
+        one_hot = np.zeros((size, i.size))
+        one_hot[i, np.arange(i.size)] = 1
+    return one_hot

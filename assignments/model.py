@@ -7,7 +7,6 @@ from utils import horizontal_flip
 class Model:
     def __init__(self):
         self.layers = []
-        self.input = 0
 
     def initialize_weights(self):
         for layer in self.layers:
