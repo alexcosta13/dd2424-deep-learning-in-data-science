@@ -2,7 +2,7 @@ import sys
 
 import numpy as np
 from tqdm import tqdm
-from utils import softmax, sample_from_probability, index_2_one_hot, indices_2_chars
+from utils import softmax, sample_from_probability, index_2_one_hot, indices_2_chars, chars_2_indices
 
 epsilon = sys.float_info.epsilon
 
@@ -26,7 +26,7 @@ class RNN:
         self.initialize_weights()
 
     def initialize_weights(self):
-        np.random.seed(400)
+        np.random.seed(42)
         sigma = self.kwargs["sigma"] if "sigma" in self.kwargs else 0.01
         W = np.random.normal(loc=0, scale=sigma, size=(self.hidden_size, self.hidden_size))
         U = np.random.normal(loc=0, scale=sigma, size=(self.hidden_size, self.input_size))
@@ -46,18 +46,18 @@ class RNN:
             self.gradients[param] = np.zeros_like(self.weights[param])
             self.m_theta[param] = np.zeros_like(self.weights[param])
 
-    def generate(self, x0=None, h0=None, seq_length=25):
+    def generate(self, x0=None, h0=None, seq_length=200):
         if x0 is None:
             x0 = index_2_one_hot(0, self.output_size)
         if h0 is None:
             h0 = np.zeros((self.hidden_size, 1))
         output = []
-        self.h = h0
+        h = h0
         xt = x0
         for _ in range(seq_length):
-            at = self.weights['W'] @ self.h + self.weights['U'] @ xt + self.weights['b']
-            self.h = np.tanh(at)
-            ot = self.weights['V'] @ self.h + self.weights['c']
+            at = self.weights['W'] @ h + self.weights['U'] @ xt + self.weights['b']
+            h = np.tanh(at)
+            ot = self.weights['V'] @ h + self.weights['c']
             pt = softmax(ot).squeeze()
             sample = sample_from_probability(self.output_size, pt)
             output.append(sample[0])
@@ -108,8 +108,36 @@ class RNN:
             self.m_theta[param] += self.gradients[param] ** 2
             self.weights[param] -= eta / np.sqrt(self.m_theta[param] + epsilon) * self.gradients[param]
 
-    def fit(self, x, y, epochs=2):
-        pass
+    def fit(self, text, seq_length=25, eta=0.1, iterations=300000, verbose=None):
+        h_prev = np.zeros(shape=(self.hidden_size, 1))
+        e = 0
+        smooth_losses = []
+
+        for iteration in range(iterations):
+            if e + seq_length > len(text):
+                h_prev = np.zeros(shape=(self.hidden_size, 1))
+                e = 0
+
+            x_chars = index_2_one_hot(np.array(chars_2_indices(text[e:e + seq_length],
+                                                               self.char_2_indices)), self.output_size)
+            y_chars = index_2_one_hot(np.array(chars_2_indices(text[e + 1:e + seq_length + 1],
+                                                               self.char_2_indices)), self.output_size)
+            loss = self.forward(x_chars, y_chars, h_prev)
+            self.backward(x_chars, y_chars)
+            self.update_weights(eta)
+
+            smooth_loss = 0.999 * smooth_loss + 0.001 * loss if "smooth_loss" in locals() else loss
+
+            smooth_losses.append(smooth_loss)
+
+            if verbose and not iteration % verbose:
+                print(f"Update step {iteration} with loss: {smooth_loss}")
+                print(f"Generated text:\n{self.generate(x0=x_chars[:, [0]], h0=h_prev)}\n\n\n")
+
+            h_prev = self.h[-1]
+            e += seq_length
+
+        return smooth_losses
 
     def compute_gradients_num(self, x, y, h=1e-4):
         num_gradients = {}
