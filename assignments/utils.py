@@ -130,3 +130,17 @@ def index_2_one_hot(i, size):
         one_hot = np.zeros((size, i.size))
         one_hot[i, np.arange(i.size)] = 1
     return one_hot
+
+
+def plot_smooth_loss(loss, title='', iterations_per_epoch=None):
+    plt.figure(figsize=(10, 4))
+    plt.plot(loss, label="Smooth loss")
+    plt.title(title)
+    epochs = len(loss) // iterations_per_epoch
+    epochs = [(i + 1) * iterations_per_epoch for i in range(epochs)]
+    if iterations_per_epoch:
+        plt.vlines(epochs, *plt.gca().get_ylim(), colors='darkorange', linestyle='-.', linewidth=1, label="Epochs")
+    plt.xlabel('Update step')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)

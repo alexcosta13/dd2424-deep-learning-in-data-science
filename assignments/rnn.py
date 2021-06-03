@@ -1,6 +1,11 @@
+import sys
+
 import numpy as np
-from tqdm import tqdm
-from utils import softmax, sample_from_probability, index_2_one_hot, indices_2_chars
+from utils import softmax, sample_from_probability, index_2_one_hot, indices_2_chars, chars_2_indices
+
+epsilon = sys.float_info.epsilon
+START_CHAR = '\t'
+END_CHAR = '\n'
 
 
 class RNN:
@@ -9,217 +14,178 @@ class RNN:
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
-        self.W = None
-        self.U = None
-        self.b = None
-        self.V = None
-        self.c = None
-        self.h = None
+
+        self.h, self.p = None, None
+
+        self.weights = {}
+        self.gradients = {}
+        self.m_theta = {}
+
         self.char_2_indices = kwargs['char_2_indices']
         self.indices_2_char = kwargs['indices_2_char']
         self.kwargs = kwargs
         self.initialize_weights()
 
-        self.last_h = None
-        self.last_p = None
-
-        self.grad_W = None
-        self.grad_U = None
-        self.grad_b = None
-        self.grad_V = None
-        self.grad_c = None
-
     def initialize_weights(self):
-        np.random.seed(400)
+        np.random.seed(42)
         sigma = self.kwargs["sigma"] if "sigma" in self.kwargs else 0.01
-        self.W = np.random.normal(loc=0, scale=sigma, size=(self.hidden_size, self.hidden_size))
-        self.U = np.random.normal(loc=0, scale=sigma, size=(self.hidden_size, self.input_size))
-        self.b = np.zeros(shape=(self.hidden_size, 1))
-        self.V = np.random.normal(loc=0, scale=sigma, size=(self.output_size, self.hidden_size))
-        self.c = np.zeros(shape=(self.output_size, 1))
-        self.h = np.zeros(shape=(self.hidden_size, 1))
+        W = np.random.normal(loc=0, scale=sigma, size=(self.hidden_size, self.hidden_size))
+        U = np.random.normal(loc=0, scale=sigma, size=(self.hidden_size, self.input_size))
+        b = np.zeros(shape=(self.hidden_size, 1))
+        V = np.random.normal(loc=0, scale=sigma, size=(self.output_size, self.hidden_size))
+        c = np.zeros(shape=(self.output_size, 1))
 
-    def generate(self, x0=None, h0=None, seq_length=25):
-        if x0 is None:
-            pass
+        self.weights = {
+            'W': W,
+            'U': U,
+            'b': b,
+            'V': V,
+            'c': c,
+        }
+
+        for param in self.weights:
+            self.gradients[param] = np.zeros_like(self.weights[param])
+            self.m_theta[param] = np.zeros_like(self.weights[param])
+
+    def generate(self, x0=None, h0=None, seq_length=200, restricted=False):
+        if x0 is None and restricted:
+            x0 = index_2_one_hot(np.array(chars_2_indices(START_CHAR, self.char_2_indices)), self.output_size)
+        elif x0 is None:
             x0 = index_2_one_hot(0, self.output_size)
         if h0 is None:
             h0 = np.zeros((self.hidden_size, 1))
+        if restricted:
+            seq_length = 140
         output = []
-        self.h = h0
+        h = h0
         xt = x0
         for _ in range(seq_length):
-            at = self.W @ self.h + self.U @ xt + self.b
-            self.h = np.tanh(at)
-            ot = self.V @ self.h + self.c
+            at = self.weights['W'] @ h + self.weights['U'] @ xt + self.weights['b']
+            h = np.tanh(at)
+            ot = self.weights['V'] @ h + self.weights['c']
             pt = softmax(ot).squeeze()
             sample = sample_from_probability(self.output_size, pt)
             output.append(sample[0])
             xt = index_2_one_hot(sample, self.output_size)
+            if restricted and indices_2_chars(output, self.indices_2_char)[-1] == END_CHAR:
+                break
         return indices_2_chars(output, self.indices_2_char)
 
-    def forward(self, x, h0=None):
-        if h0 is None:
-            self.h = np.zeros(shape=(self.hidden_size, 1))
-        else:
-            self.h = h0
-        self.last_h = [self.h]
-        self.last_p = []
-
-        for i in range(x.shape[1]):
-            at = self.W @ self.h + self.U @ x[:, [i]] + self.b
-            self.h = np.tanh(at)
-            ot = self.V @ self.h + self.c
-            pt = softmax(ot)#.squeeze()
-            self.last_h.append(self.h)
-            self.last_p.append(pt)
-
-        #self.last_h = np.array(self.last_h)
-        #self.last_p = np.array(self.last_p)
-        return self.last_p
-
-    def compute_gradients(self, x, y, reg_lambda=0.0):
+    def forward(self, x, y, h0):
         seq_length = x.shape[1]
-        self.forward(x)
+        self.p, self.h = [None] * seq_length, [None] * (seq_length + 1)
 
-        self.grad_W = np.zeros(self.W.shape)
-        self.grad_U = np.zeros(self.U.shape)
-        self.grad_b = np.zeros(self.b.shape)
-        self.grad_V = np.zeros(self.V.shape)
-        self.grad_c = np.zeros(self.c.shape)
-
-        dLdo = []
+        self.h[0] = h0
+        loss = 0
 
         for t in range(seq_length):
-            dLdo.append(- (y[:, [t]] - self.last_p[t]).T)
-            g = dLdo[t]
-            self.grad_V += g.T @ self.last_h[t + 1].T
-            self.grad_c += g.T
+            a = self.weights['W'] @ self.h[t] + self.weights['U'] @ x[:, [t]] + self.weights['b']
+            self.h[t + 1] = np.tanh(a)
+            o = self.weights['V'] @ self.h[t + 1] + self.weights['c']
+            self.p[t] = softmax(o)  # .squeeze()
+            loss -= np.log(y[:, [t]].T @ self.p[t])[0, 0]
+
+        return loss
+
+    def backward(self, x, y):
+        seq_length = x.shape[1]
+
+        self.gradients = {}
+        for param in self.weights:
+            self.gradients[param] = np.zeros_like(self.weights[param])
 
         dLda = np.zeros((1, self.hidden_size))
+        for t in reversed(range(seq_length)):
+            g = -(y[:, [t]] - self.p[t]).T
+            self.gradients['V'] += g.T @ self.h[t + 1].T
+            self.gradients['c'] += g.T
+            dLdh = g @ self.weights['V'] + dLda @ self.weights['W']
+            dLda = dLdh @ np.diag(1 - self.h[t + 1].squeeze() ** 2)
+            self.gradients['W'] += dLda.T @ self.h[t].T
+            self.gradients['U'] += dLda.T @ x[:, [t]].T
+            self.gradients['b'] += dLda.T
 
-        for t in reversed(range(seq_length - 1)):
-            dLdh = dLdo[t] @ self.V + dLda @ self.W
-            dLda = dLdh @ np.diag(1 - (self.last_h[t + 1].squeeze() ** 2))
-            g = dLda
-            self.grad_W += g.T @ self.last_h[t].T
-            self.grad_U += g.T @ x[:, [t]].T
-            self.grad_b += g.T
-
-        return self.grad_W, self.grad_U, self.grad_b, self.grad_V, self.grad_c
+        for param in self.weights:
+            self.gradients[param] = np.clip(self.gradients[param], -5, 5)
+            
+        return self.gradients
 
     def update_weights(self, eta):
-        self.m_theta_W += self.grad_W ** 2
-        self.m_theta_U += self.grad_U ** 2
-        self.m_theta_b += self.grad_b ** 2
-        self.m_theta_V += self.grad_V ** 2
-        self.m_theta_c += self.grad_c ** 2
+        for param in self.weights:
+            self.m_theta[param] += self.gradients[param] ** 2
+            self.weights[param] -= eta / np.sqrt(self.m_theta[param] + epsilon) * self.gradients[param]
 
-        denom = (self.m_theta['dLd' + key] + 1e-10) ** -0.5
-        self.params[key] = self.params[key] - self.eta * np.multiply(denom, self.gradients['dLd' + key])
-    self.W -= eta * self.grad_W
-        self.U -= eta * self.grad_U
-        self.b -= eta * self.grad_b
-        self.V -= eta * self.grad_V
-        self.c -= eta * self.grad_c
+    def fit(self, text, seq_length=25, eta=0.1, iterations=300000, verbose=None, restricted=False):
+        h_prev = np.zeros(shape=(self.hidden_size, 1))
+        e = 0
+        smooth_losses = []
 
-    def compute_loss(self, x, y):
-        loss = 0
-        for p in self.last_p:
-            loss += - np.sum(np.log(np.sum(y * p, axis=0)))
-        return loss
+        for iteration in range(iterations):
+            if e + seq_length > len(text):
+                h_prev = np.zeros(shape=(self.hidden_size, 1))
+                e = 0
 
-    def compute_cost(self, y0, pt):
-        loss = 0
-        for t in range(len(pt)):
-            y = np.reshape(y0.T[t], (-1, 1))
-            loss -= sum(np.log(np.dot(y.T, pt[t])))
-        return loss
+            if restricted:
+                split_ = ''.join(text[e:e + seq_length]).split(END_CHAR)
+                x_substring = split_[0]
+                if len(split_) > 1:
+                    x_substring += END_CHAR
+                y_substring = text[e + 1:e + len(x_substring) + 1]
+            else:
+                x_substring = text[e:e + seq_length]
+                y_substring = text[e + 1:e + seq_length + 1]
 
-    def fit(self, x, y, x_val=None, y_val=None, n_epochs=25, n_batch=100, eta=0.1, reg_lambda=0.01, seq_length=25):
-        data_points = x.shape[1]
-        train_loss, val_loss, train_accuracy, val_accuracy = [], [], [], []
-        for _ in tqdm(range(n_epochs)):
-            for i in range(int(data_points / n_batch) - 1):
-                start = i * n_batch
-                end = min((i + 1) * n_batch, data_points)
-                x_batch = x[:, start:end]
-                y_batch = y[:, start:end]
+            x_chars = index_2_one_hot(np.array(chars_2_indices(x_substring,
+                                                               self.char_2_indices)), self.output_size)
+            y_chars = index_2_one_hot(np.array(chars_2_indices(y_substring,
+                                                               self.char_2_indices)), self.output_size)
+            loss = self.forward(x_chars, y_chars, h_prev)
+            self.backward(x_chars, y_chars)
+            self.update_weights(eta)
 
-                self.compute_gradients(x_batch, y_batch, reg_lambda)
-                self.update_weights(eta)
+            smooth_loss = 0.999 * smooth_loss + 0.001 * loss if "smooth_loss" in locals() else loss
 
-            train_loss.append(self.compute_loss(x, y))
-            train_accuracy.append(self.accuracy(x, y))
-            if x_val is not None:
-                val_loss.append(self.compute_loss(x_val, y_val))
-                val_accuracy.append(self.accuracy(x_val, y_val))
-        return (train_loss, val_loss), (train_accuracy, val_accuracy)
+            smooth_losses.append(smooth_loss)
 
-    def compute_gradients_num(self, x, y, reg_lambda=0.0, h=1e-4):
-        def compute_loss():
-            loss = 0
-            hidden_state = np.zeros(shape=(self.hidden_size, 1))
-            for i in range(x.shape[1]):
-                a = self.W @ hidden_state + self.U @ x[:, [i]] + self.b
-                hidden_state = np.tanh(a)
-                ot = self.V @ hidden_state + self.c
-                p = softmax(ot)
-                loss += - np.sum(np.log(np.sum(y * p, axis=0)))
-            return loss
+            if verbose and not iteration % verbose:
+                print(f"Update step {iteration} with loss: {smooth_loss}")
+                if restricted:
+                    x0 = index_2_one_hot(np.array(chars_2_indices(START_CHAR, self.char_2_indices)), self.output_size)
+                    print(f"Generated text:\n{self.generate(x0=x0, h0=h_prev)}\n\n\n")
+                else:
+                    print(f"Generated text:\n{self.generate(x0=x_chars[:, [0]], h0=h_prev)}\n\n\n")
 
-        grad_W = np.zeros_like(self.W)
-        grad_U = np.zeros_like(self.U)
-        grad_b = np.zeros_like(self.b)
-        grad_V = np.zeros_like(self.V)
-        grad_c = np.zeros_like(self.c)
+            if restricted and len(split_) > 1:
+                h_prev = np.zeros(shape=(self.hidden_size, 1))
+                e += len(x_substring)
+            else:
+                h_prev = self.h[-1]
+                e += seq_length
 
-        # Check gradient for W
-        for i in range(len(self.W)):
-            for j in range(len(self.W[i])):
-                self.W[i][j] -= h
-                c1 = compute_loss()
-                self.W[i][j] += 2 * h
-                c2 = compute_loss()
-                grad_W[i][j] = (c2 - c1) / (2 * h)
-                self.W[i][j] -= h
+        return smooth_losses
 
-        # Check gradient for U
-        for i in range(len(self.U)):
-            for j in range(len(self.U[i])):
-                self.U[i][j] -= h
-                c1 = compute_loss()
-                self.U[i][j] += 2 * h
-                c2 = compute_loss()
-                grad_U[i][j] = (c2 - c1) / (2 * h)
-                self.U[i][j] -= h
+    def compute_gradients_num(self, x, y, h=1e-4):
+        num_gradients = {}
+        for param in self.weights:
+            num_gradients[param] = np.zeros_like(self.weights[param])
 
-        # Check gradient for b
-        for i in range(len(self.b)):
-            self.b[i] -= h
-            c1 = compute_loss()
-            self.b[i] += 2 * h
-            c2 = compute_loss()
-            grad_b[i] = (c2 - c1) / (2 * h)
-            self.b[i] -= h
+        for param in ['W', 'U', 'V']:
+            for i in range(len(self.weights[param])):
+                for j in range(len(self.weights[param][i])):
+                    self.weights[param][i][j] -= h
+                    c1 = self.forward(x, y, np.zeros(shape=(self.hidden_size, 1)))
+                    self.weights[param][i][j] += 2 * h
+                    c2 = self.forward(x, y, np.zeros(shape=(self.hidden_size, 1)))
+                    num_gradients[param][i][j] = (c2 - c1) / (2 * h)
+                    self.weights[param][i][j] -= h
 
-        # Check gradient for V
-        for i in range(len(self.V)):
-            for j in range(len(self.V[i])):
-                self.V[i][j] -= h
-                c1 = compute_loss()
-                self.V[i][j] += 2 * h
-                c2 = compute_loss()
-                grad_V[i][j] = (c2 - c1) / (2 * h)
-                self.V[i][j] -= h
+        for param in ['b', 'c']:
+            for i in range(len(self.weights[param])):
+                self.weights[param][i] -= h
+                c1 = self.forward(x, y, np.zeros(shape=(self.hidden_size, 1)))
+                self.weights[param][i] += 2 * h
+                c2 = self.forward(x, y, np.zeros(shape=(self.hidden_size, 1)))
+                num_gradients[param][i] = (c2 - c1) / (2 * h)
+                self.weights[param][i] -= h
 
-        # Check gradient for c
-        for i in range(len(self.c)):
-            self.c[i] -= h
-            c1 = compute_loss()
-            self.c[i] += 2 * h
-            c2 = compute_loss()
-            grad_c[i] = (c2 - c1) / (2 * h)
-            self.c[i] -= h
-
-        return grad_W, grad_U, grad_b, grad_V, grad_c
+        return num_gradients
