@@ -1,5 +1,9 @@
 import numpy as np
+import pandas as pd
 from utils import show_image
+
+START_CHAR = '\t'
+END_CHAR = '\n'
 
 
 def load_batch(filename):
@@ -80,5 +84,29 @@ def load_and_process_text(filename):
     indices_2_char = {index: val for index, val in enumerate(book_chars)}
     return {'book_data': book_data,
             'book_chars': book_chars,
+            'char_2_indices': char_2_indices,
+            'indices_2_char': indices_2_char}
+
+
+def clean_tweet(tweet):
+    tweet = tweet.replace('\t', ' ').replace('\n', ' ')
+    tweet = " ".join(filter(lambda x: x[:8] != 'https://', tweet.split()))
+    tweet = START_CHAR + tweet + END_CHAR
+    return tweet
+
+
+def load_and_process_tweets(filename, size=None):
+    df1 = pd.read_csv('datasets/' + filename, delimiter=",")
+    list_of_tweets = df1['text'].to_list()
+    if size:
+        list_of_tweets = list_of_tweets[:size]
+    tweets = list(map(clean_tweet, list_of_tweets))
+    data = ''.join(tweets)
+    all_data = [c for c in data]
+    chars = list(set(all_data))
+    char_2_indices = {val: index for index, val in enumerate(chars)}
+    indices_2_char = {index: val for index, val in enumerate(chars)}
+    return {'all_data': all_data,
+            'chars': chars,
             'char_2_indices': char_2_indices,
             'indices_2_char': indices_2_char}
